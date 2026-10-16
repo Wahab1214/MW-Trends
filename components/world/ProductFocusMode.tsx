@@ -14,11 +14,12 @@ export default function ProductFocusMode() {
   const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
-    const handleOpenFocus = (e: CustomEvent<string>) => {
-      setFocusedProduct(e.detail as unknown as Product); // Note: Event payload was slug, but store expects Product.
+    const handleOpenFocus = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setFocusedProduct(customEvent.detail as unknown as Product);
     };
-    window.addEventListener('OPEN_PRODUCT_FOCUS' as any, handleOpenFocus);
-    return () => window.removeEventListener('OPEN_PRODUCT_FOCUS' as any, handleOpenFocus);
+    window.addEventListener('OPEN_PRODUCT_FOCUS', handleOpenFocus);
+    return () => window.removeEventListener('OPEN_PRODUCT_FOCUS', handleOpenFocus);
   }, [setFocusedProduct]);
 
   useEffect(() => {
@@ -27,10 +28,12 @@ export default function ProductFocusMode() {
     if (slug) {
       const data = getProductBySlug(slug);
       if (data) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setProduct(data);
         if (data.variants && data.variants.length > 0) setSelectedVariant(data.variants[0]);
       }
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setProduct(null);
     }
   }, [focusedProduct]);

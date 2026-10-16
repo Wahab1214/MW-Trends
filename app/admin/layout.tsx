@@ -57,15 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
 
       {/* Sidebar (Desktop sticky, Mobile overlay) */}
-      <AnimatePresence>
-        {(isMobileMenuOpen || typeof window !== 'undefined' && window.innerWidth >= 768) && (
-          <motion.aside 
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-            className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-[#111] text-[#F7F4ED] shrink-0 z-40 flex flex-col pt-16 md:pt-0 shadow-xl md:shadow-none overflow-y-auto hide-scrollbar`}
-          >
+      <aside className={`fixed md:sticky top-0 left-0 h-screen w-64 bg-[#111] text-[#F7F4ED] shrink-0 z-40 flex flex-col pt-16 md:pt-0 shadow-xl md:shadow-none overflow-y-auto hide-scrollbar transition-transform duration-300 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
             <div className="p-6 border-b border-[#222] hidden md:block">
               <h1 className="text-sm font-bold tracking-[0.2em] text-white">MW CONTROL</h1>
               <p className="text-[10px] tracking-widest text-[#888] mt-1">OPERATIONS CENTER</p>
@@ -117,9 +109,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <option value="SUPPORT_AGENT">Support Agent</option>
               </select>
             </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+          </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 pt-16 md:pt-0">

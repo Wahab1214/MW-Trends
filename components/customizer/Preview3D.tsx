@@ -31,7 +31,6 @@ function RenderDesignTexture({ side }: { side: 'front' | 'back' }) {
               fontSize={0.5}
               maxWidth={4}
               textAlign="center"
-              font="/fonts/Inter-Bold.ttf" // Assumes standard next.js font path
             >
               {el.content}
             </DreiText>
@@ -85,10 +84,11 @@ export default function Preview3D() {
   return (
     <div className="w-full h-full bg-[#111111] relative rounded-lg overflow-hidden cursor-grab active:cursor-grabbing">
       <Canvas shadows dpr={[1, 2]} camera={{ position: [0, 1, 6], fov: 40 }}>
-        <Environment preset="studio" environmentIntensity={0.8} />
-        
-        <ambientLight intensity={0.5} />
-        <spotLight position={[5, 5, 5]} angle={0.5} penumbra={1} intensity={1} castShadow />
+        {/* Manual Studio Lighting (HDR Removed for Stability) */}
+        <ambientLight intensity={1.0} color="#F4EFE7" />
+        <spotLight position={[5, 10, 5]} angle={0.5} penumbra={1} intensity={2} castShadow color="#ffffff" />
+        <spotLight position={[-5, 5, -5]} angle={0.5} penumbra={1} intensity={1.5} color="#D4AF37" />
+        <pointLight position={[0, 2, 5]} intensity={1.0} color="#F4EFE7" />
         
         <Suspense fallback={null}>
           <Apparel3D />

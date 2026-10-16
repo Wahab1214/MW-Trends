@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ProductVariant } from '../data/mockCatalog';
+import type { ProductVariant } from '../data/mockCatalog';
 
 export type ElementType = 'image' | 'text';
 

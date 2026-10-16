@@ -17,7 +17,14 @@ export type EventName =
   | 'purchase'
   | 'enter_mw_world'
   | 'interact_living_poster'
-  | 'open_custom_lab';
+  | 'open_custom_lab'
+  | 'shop_enter'
+  | 'shop_exit'
+  | 'product_impression'
+  | 'product_focus'
+  | 'product_view_details'
+  | 'filter_apply'
+  | 'search_shop';
 
 export interface AnalyticsPayload {
   [key: string]: any;

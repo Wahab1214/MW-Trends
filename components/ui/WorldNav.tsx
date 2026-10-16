@@ -1,8 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Map, ShoppingBag, X } from "lucide-react";
+import { useMemo, useEffect } from "react";
+import { motion } from "framer-motion";
+import { ShoppingBag, ChevronUp, ChevronDown, ArrowLeft } from "lucide-react";
+import { useStore } from "@/lib/store/useStore";
+import {
+  DEFAULT_BUILDING_CATEGORIES,
+  getTotalFloors,
+  getCategoriesForFloor,
+  getActiveCategories,
+  formatFloorNumber,
+} from "@/lib/data/buildingCategories";
 
 interface WorldNavProps {
   onNavigate: (target: string) => void;
@@ -10,97 +18,265 @@ interface WorldNavProps {
 }
 
 export default function WorldNav({ onNavigate, onToggleQuickShop }: WorldNavProps) {
-  const [mapOpen, setMapOpen] = useState(false);
+  const currentFloor = useStore((state) => state.currentFloor);
+  const setCurrentFloor = useStore((state) => state.setCurrentFloor);
+  const isFloorTransitioning = useStore((state) => state.isFloorTransitioning);
+  const selectedMobileSlot = useStore((state) => state.selectedMobileSlot);
+  const setSelectedMobileSlot = useStore((state) => state.setSelectedMobileSlot);
+  const setIsStairsAscending = useStore((state) => state.setIsStairsAscending);
+  const categories = useStore((state) => state.categories);
+  const categoryCountOverride = useStore((state) => state.categoryCountOverride);
+  const setFloorTransitionState = useStore((state) => state.setFloorTransitionState);
+
+  // Active categories and total floor calculation
+  const activeCategories = useMemo(() => {
+    let source = categories;
+    if (categoryCountOverride !== null) {
+      source = categories.slice(0, categoryCountOverride);
+    }
+    return getActiveCategories(source);
+  }, [categories, categoryCountOverride]);
+
+  const totalFloors = useMemo(() => {
+    return getTotalFloors(activeCategories);
+  }, [activeCategories]);
+
+  // Current floor categories
+  const floorCategories = useMemo(() => {
+    return getCategoriesForFloor(activeCategories, currentFloor);
+  }, [activeCategories, currentFloor]);
+
+  // Ensure currentFloor is clamped within valid total floors
+  useEffect(() => {
+    if (currentFloor > totalFloors) {
+      setCurrentFloor(totalFloors);
+    }
+  }, [totalFloors, currentFloor, setCurrentFloor]);
+
+  // Synchronize URL query parameter with current floor
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      const currentParam = url.searchParams.get("floor");
+      const targetParam = currentFloor > 1 ? String(currentFloor) : null;
+      if (currentParam !== targetParam) {
+        if (targetParam) {
+          url.searchParams.set("floor", targetParam);
+        } else {
+          url.searchParams.delete("floor");
+        }
+        window.history.pushState({ floor: currentFloor }, "", url.toString());
+      }
+    }
+  }, [currentFloor]);
+
+  // Keyboard floor navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isFloorTransitioning) return;
+
+      if (e.key === "ArrowUp" || e.key === "PageUp") {
+        e.preventDefault();
+        if (currentFloor < totalFloors) {
+          handleNextFloor();
+        }
+      } else if (e.key === "ArrowDown" || e.key === "PageDown") {
+        e.preventDefault();
+        if (currentFloor > 1) {
+          handlePrevFloor();
+        }
+      } else if (e.key >= "1" && e.key <= "9") {
+        const target = parseInt(e.key, 10);
+        if (target <= totalFloors) {
+          handleSelectFloor(target);
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentFloor, totalFloors, isFloorTransitioning]);
+
+  const handleNextFloor = () => {
+    if (!isFloorTransitioning && currentFloor < totalFloors) {
+      setSelectedMobileSlot(null);
+      setIsStairsAscending(true);
+      setFloorTransitionState('ascending');
+      setTimeout(() => {
+        setCurrentFloor(currentFloor + 1);
+        setIsStairsAscending(false);
+        setFloorTransitionState('arriving');
+        setTimeout(() => setFloorTransitionState('idle'), 400);
+      }, 700);
+    }
+  };
+
+  const handlePrevFloor = () => {
+    if (!isFloorTransitioning && currentFloor > 1) {
+      setSelectedMobileSlot(null);
+      setFloorTransitionState('leaving');
+      setTimeout(() => {
+        setCurrentFloor(currentFloor - 1);
+        setFloorTransitionState('arriving');
+        setTimeout(() => setFloorTransitionState('idle'), 300);
+      }, 300);
+    }
+  };
+
+  const handleSelectFloor = (floorNum: number) => {
+    if (!isFloorTransitioning && floorNum !== currentFloor) {
+      setSelectedMobileSlot(null);
+      if (floorNum > currentFloor) {
+        setIsStairsAscending(true);
+        setFloorTransitionState('ascending');
+        setTimeout(() => {
+          setCurrentFloor(floorNum);
+          setIsStairsAscending(false);
+          setFloorTransitionState('arriving');
+          setTimeout(() => setFloorTransitionState('idle'), 400);
+        }, 700);
+      } else {
+        setFloorTransitionState('leaving');
+        setTimeout(() => {
+          setCurrentFloor(floorNum);
+          setFloorTransitionState('arriving');
+          setTimeout(() => setFloorTransitionState('idle'), 300);
+        }, 300);
+      }
+    }
+  };
+
+  const floorNumbers = Array.from({ length: totalFloors }, (_, i) => i + 1);
 
   return (
     <>
-      <div className="absolute top-0 left-0 w-full p-8 flex justify-between items-start pointer-events-none z-50">
-        <div className="text-2xl font-bold tracking-[0.25em] text-[#D4AF37] pointer-events-auto">
-          MW TRENDS
-        </div>
-        <div className="flex gap-6 pointer-events-auto">
-          <button 
-            onClick={onToggleQuickShop}
-            className="group px-5 py-2.5 flex flex-col items-end border border-[#D4AF37]/20 bg-[#050505]/60 backdrop-blur-md hover:border-[#D4AF37] hover:bg-[#111111]/80 transition-all duration-300"
-          >
-            <span className="text-sm font-medium tracking-widest text-[#F7F4ED]">QUICK SHOP</span>
-            <span className="text-[10px] tracking-wider text-[#9B9B9B] group-hover:text-[#D4AF37] transition-colors">SKIP THE WORLD</span>
-          </button>
-          <button className="p-3 border border-[#D4AF37]/20 bg-[#050505]/60 backdrop-blur-md hover:border-[#D4AF37] transition-all duration-300 flex items-center justify-center">
-            <ShoppingBag size={20} className="text-[#F7F4ED]" />
-          </button>
-        </div>
-      </div>
+      {/* Top Header is now provided globally and unified by GlobalNav in RootLayout */}
 
-      <div className="absolute bottom-10 left-1/2 -translate-x-1/2 pointer-events-auto z-50">
-        <button 
-          onClick={() => setMapOpen(true)}
-          className="group flex items-center gap-3 px-8 py-4 text-xs font-medium tracking-[0.2em] border border-[#D4AF37]/30 bg-[#050505]/80 backdrop-blur-md hover:bg-[#111111] hover:border-[#D4AF37] transition-all duration-500"
-        >
-          <Map size={16} className="text-[#D4AF37] group-hover:scale-110 transition-transform" />
-          DISTRICT MAP
-        </button>
-      </div>
-
-      <AnimatePresence>
-        {mapOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-[#050505]/90 backdrop-blur-xl pointer-events-auto"
-          >
-            <div className="relative p-16 bg-[#0a0a0a] border border-[#D4AF37]/20 shadow-2xl max-w-4xl w-full">
-              <button 
-                onClick={() => setMapOpen(false)}
-                className="absolute top-8 right-8 text-[#9B9B9B] hover:text-[#D4AF37] transition-colors"
+      {/* ================================================== */}
+      {/* 2. MOBILE GUIDED STOREFRONT DOCK (Phone screens) */}
+      {/* ================================================== */}
+      <div className="md:hidden absolute bottom-20 left-0 w-full px-4 pointer-events-auto z-40">
+        <div className="bg-[#141619]/80 border border-[#D4AF37]/20 backdrop-blur-xl rounded-xl p-2.5 shadow-2xl flex flex-col gap-2">
+          <div className="flex items-center justify-between px-2 text-[10px] tracking-[0.25em] text-[#D3C7B8]/70">
+            <span>{formatFloorNumber(currentFloor)} BOUTIQUES</span>
+            {selectedMobileSlot !== null && (
+              <button
+                onClick={() => setSelectedMobileSlot(null)}
+                className="text-[#D4AF37] hover:underline flex items-center gap-1 text-[10px]"
               >
-                <X size={28} />
+                <ArrowLeft size={10} /> ATRIUM
               </button>
-              
-              <h2 className="text-sm tracking-[0.4em] text-[#D4AF37] mb-16 text-center">MW DISTRICT ARCHITECTURE</h2>
-              
-              <div className="relative grid grid-cols-3 gap-8 text-center max-w-2xl mx-auto">
-                {/* Connecting lines SVG background */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20" style={{ zIndex: 0 }}>
-                  <line x1="16%" y1="50%" x2="50%" y2="50%" stroke="#D4AF37" strokeWidth="1" />
-                  <line x1="84%" y1="50%" x2="50%" y2="50%" stroke="#D4AF37" strokeWidth="1" />
-                  <line x1="50%" y1="16%" x2="50%" y2="50%" stroke="#D4AF37" strokeWidth="1" />
-                  <line x1="50%" y1="84%" x2="50%" y2="50%" stroke="#D4AF37" strokeWidth="1" />
-                </svg>
+            )}
+          </div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {floorCategories.map((cat, idx) => {
+              const isSelected = selectedMobileSlot === idx;
+              const isAvailable = cat !== null;
 
-                <MapNode name="PAPER ATELIER" status="inactive" />
-                <MapNode name="TEE STUDIO" onClick={() => { onNavigate("tee-studio"); setMapOpen(false); }} />
-                <MapNode name="FRAME GALLERY" status="inactive" />
-                
-                <MapNode name="CUSTOM LAB" onClick={() => { onNavigate("custom-lab"); setMapOpen(false); }} />
-                <MapNode name="MW PLAZA" onClick={() => { onNavigate("plaza"); setMapOpen(false); }} isCenter />
-                <MapNode name="MUG BAR" onClick={() => { onNavigate("mug-bar"); setMapOpen(false); }} />
+              return (
+                <button
+                  key={`mobile-slot-${idx}`}
+                  disabled={!isAvailable}
+                  onClick={() => {
+                    if (isSelected && cat) {
+                      onNavigate(cat.slug);
+                    } else {
+                      setSelectedMobileSlot(idx);
+                    }
+                  }}
+                  className={`py-2 px-1 text-center rounded-lg transition-all flex flex-col items-center justify-center border ${
+                    isSelected
+                      ? "border-[#D4AF37] bg-[#D4AF37]/20 text-[#F4EFE7]"
+                      : isAvailable
+                      ? "border-white/10 bg-[#1B1D21]/50 text-[#D3C7B8]"
+                      : "border-white/5 bg-transparent text-white/20"
+                  }`}
+                >
+                  <span className="text-[9px] font-medium tracking-wider truncate w-full">
+                    {cat ? cat.name : "SOON"}
+                  </span>
+                  {isSelected && cat && (
+                    <span className="text-[7px] text-[#D4AF37] tracking-tighter mt-0.5">
+                      ENTER →
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
-                <MapNode name="GIFT HOUSE" status="inactive" />
-                <MapNode name="STREETWEAR GARAGE" status="inactive" />
-                <MapNode name="CASE LAB" status="inactive" />
-              </div>
-            </div>
-          </motion.div>
+      {/* ================================================== */}
+      {/* 3. SLIM ARCHITECTURAL FLOOR NAVIGATOR (DESKTOP) */}
+      {/* Placed at Bottom-Right to preserve central corridor sightlines */}
+      {/* ================================================== */}
+      <nav
+        aria-label="Building Floor Navigation"
+        className="hidden md:flex flex-col items-end gap-2.5 absolute bottom-8 right-8 pointer-events-auto z-50 select-none"
+      >
+        {/* Next Floor Slim Pill */}
+        {currentFloor < totalFloors && (
+          <button
+            onClick={handleNextFloor}
+            disabled={isFloorTransitioning}
+            aria-label={`Ascend to Floor ${currentFloor + 1}`}
+            className="group px-4 py-2 rounded-full border border-[#D4AF37]/35 bg-[#141619]/75 backdrop-blur-md hover:border-[#D4AF37] hover:bg-[#D4AF37]/15 transition-all text-[10px] tracking-[0.25em] font-medium text-[#F4EFE7] flex items-center gap-2 shadow-lg cursor-pointer"
+          >
+            <span>ASCEND TO {formatFloorNumber(currentFloor + 1)}</span>
+            <ChevronUp size={13} className="text-[#D4AF37] group-hover:-translate-y-0.5 transition-transform" />
+          </button>
         )}
-      </AnimatePresence>
-    </>
-  );
-}
 
-function MapNode({ name, onClick, isCenter, status = "active" }: { name: string, onClick?: () => void, isCenter?: boolean, status?: "active" | "inactive" }) {
-  const isActive = status === "active";
-  
-  return (
-    <button 
-      onClick={isActive ? onClick : undefined}
-      disabled={!isActive}
-      className={`relative p-6 border ${isActive ? 'border-[#D4AF37]/30 hover:border-[#D4AF37] cursor-pointer' : 'border-white/5 cursor-not-allowed'} transition-all flex flex-col items-center justify-center gap-4 ${isCenter ? 'bg-[#1B1B1B]' : 'bg-[#050505]'} z-10`}
-    >
-      <div className={`w-4 h-4 rotate-45 ${isCenter ? 'bg-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.5)]' : isActive ? 'bg-[#D4AF37]/50' : 'bg-white/10'}`} />
-      <span className={`text-xs tracking-[0.2em] ${isActive ? 'text-[#F7F4ED]' : 'text-[#9B9B9B]/50'}`}>{name}</span>
-      {!isActive && <span className="absolute bottom-2 text-[8px] tracking-widest text-[#D4AF37]/50">COMING SOON</span>}
-    </button>
+        {/* Minimal Floor Numeral Bar */}
+        <div className="flex items-center gap-3 px-4 py-2 rounded-full border border-[#D4AF37]/20 bg-[#141619]/75 backdrop-blur-md shadow-xl text-xs font-mono">
+          <span className="text-[9px] tracking-[0.25em] text-[#D3C7B8]/60 mr-1 font-sans">
+            FLOOR
+          </span>
+
+          {floorNumbers.map((num, i) => {
+            const isActive = num === currentFloor;
+            return (
+              <div key={`floor-nav-${num}`} className="flex items-center gap-3">
+                <button
+                  onClick={() => handleSelectFloor(num)}
+                  disabled={isFloorTransitioning}
+                  aria-label={`Switch to Floor ${num}`}
+                  className={`transition-all relative py-0.5 cursor-pointer ${
+                    isActive
+                      ? "text-[#D4AF37] font-bold"
+                      : "text-[#D3C7B8]/50 hover:text-[#F4EFE7]"
+                  }`}
+                >
+                  <span>{num < 10 ? `0${num}` : num}</span>
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeFloorIndicator"
+                      className="absolute -bottom-1 left-0 right-0 h-[1.5px] bg-[#D4AF37] shadow-[0_0_8px_#D4AF37]"
+                    />
+                  )}
+                </button>
+                {i < floorNumbers.length - 1 && (
+                  <span className="text-[#D4AF37]/30 text-[10px]">•</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Previous Floor Slim Pill */}
+        {currentFloor > 1 && (
+          <button
+            onClick={handlePrevFloor}
+            disabled={isFloorTransitioning}
+            aria-label={`Descend to Floor ${currentFloor - 1}`}
+            className="group px-4 py-2 rounded-full border border-[#D4AF37]/25 bg-[#141619]/75 backdrop-blur-md hover:border-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all text-[10px] tracking-[0.25em] font-medium text-[#D3C7B8] flex items-center gap-2 shadow-lg cursor-pointer"
+          >
+            <ChevronDown size={13} className="text-[#D4AF37] group-hover:translate-y-0.5 transition-transform" />
+            <span>DESCEND TO {formatFloorNumber(currentFloor - 1)}</span>
+          </button>
+        )}
+      </nav>
+    </>
   );
 }
